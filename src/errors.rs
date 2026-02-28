@@ -1,4 +1,4 @@
-use actix_web::{http::StatusCode, HttpResponse, ResponseError};
+use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use serde::Serialize;
 use std::fmt;
 
@@ -34,9 +34,7 @@ impl fmt::Display for AppError {
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self {
-            AppError::InternalError(_) | AppError::DbError(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            AppError::InternalError(_) | AppError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
@@ -64,9 +62,7 @@ impl ResponseError for AppError {
 impl From<diesel::result::Error> for AppError {
     fn from(err: diesel::result::Error) -> Self {
         match err {
-            diesel::result::Error::NotFound => {
-                AppError::NotFound("Record not found".to_string())
-            }
+            diesel::result::Error::NotFound => AppError::NotFound("Record not found".to_string()),
             _ => AppError::DbError(err.to_string()),
         }
     }

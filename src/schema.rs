@@ -43,8 +43,4 @@ diesel::table! {
 diesel::joinable!(permissions -> roles (role_id));
 diesel::joinable!(users -> roles (role_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    permissions,
-    roles,
-    users,
-);
+diesel::allow_tables_to_appear_in_same_query!(permissions, roles, users,);

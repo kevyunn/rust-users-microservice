@@ -5,7 +5,7 @@ mod handlers;
 mod models;
 mod schema;
 
-use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web::{App, HttpServer, middleware::Logger, web};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
