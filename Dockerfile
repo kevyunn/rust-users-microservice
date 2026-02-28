@@ -10,7 +10,9 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release && rm -rf src
 
-# Build the real application
+# Copy project files
+COPY diesel.toml ./
+COPY migrations ./migrations
 COPY src ./src
 RUN touch src/main.rs && cargo build --release
 

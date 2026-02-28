@@ -1,0 +1,2 @@
+[env]
+PQ_LIB_DIR = "/opt/homebrew/opt/libpq/lib"
