@@ -1,5 +1,8 @@
 use std::env;
 
+#[derive(Clone)]
+pub struct JwtSecret(pub String);
+
 pub struct AppConfig {
     pub database_url: String,
     pub server_host: String,
