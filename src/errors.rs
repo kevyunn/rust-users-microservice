@@ -63,7 +63,17 @@ impl From<diesel::result::Error> for AppError {
     fn from(err: diesel::result::Error) -> Self {
         match err {
             diesel::result::Error::NotFound => AppError::NotFound("Record not found".to_string()),
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UniqueViolation,
+                info,
+            ) => AppError::BadRequest(format!("Already exists: {}", info.message())),
             _ => AppError::DbError(err.to_string()),
         }
+    }
+}
+
+impl From<actix_web::error::BlockingError> for AppError {
+    fn from(_: actix_web::error::BlockingError) -> Self {
+        AppError::InternalError("Server error: blocking operation cancelled".to_string())
     }
 }

@@ -53,3 +53,19 @@ pub struct UserResponse {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
+
+impl UserResponse {
+    pub fn from_user(user: User, role_name: String) -> Self {
+        Self {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            role: role_name,
+            is_active: user.is_active,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+        }
+    }
+}
