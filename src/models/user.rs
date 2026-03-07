@@ -37,6 +37,7 @@ pub struct UpdateUser {
     pub email: Option<String>,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
+    pub role_id: Option<i32>,
     pub is_active: Option<bool>,
     pub updated_at: Option<NaiveDateTime>,
 }

@@ -5,7 +5,6 @@ use serde::Deserialize;
 use crate::config::JwtSecret;
 use crate::db::DbPool;
 use crate::errors::AppError;
-use crate::middleware::auth::AuthenticatedUser;
 use crate::models::role::Role;
 use crate::models::user::{NewUser, User, UserResponse};
 use crate::schema::{roles, users};
@@ -126,22 +125,3 @@ pub async fn login(
     Ok(HttpResponse::Ok().json(login_response))
 }
 
-pub async fn me(
-    pool: web::Data<DbPool>,
-    auth_user: AuthenticatedUser,
-) -> Result<HttpResponse, AppError> {
-    let pool = pool.into_inner();
-
-    let user_response = web::block(move || {
-        let mut conn = pool.get().map_err(|e| AppError::DbError(e.to_string()))?;
-
-        let user: User = users::table.find(auth_user.user_id).first(&mut conn)?;
-
-        let role: Role = roles::table.find(user.role_id).first(&mut conn)?;
-
-        Ok::<UserResponse, AppError>(UserResponse::from_user(user, role.name))
-    })
-    .await??;
-
-    Ok(HttpResponse::Ok().json(user_response))
-}
