@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod health;
+pub mod roles;
 pub mod users;
 
 use actix_web::web;
@@ -20,6 +21,13 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("/{id}", web::get().to(users::get_by_id))
                     .route("/{id}", web::put().to(users::update))
                     .route("/{id}", web::delete().to(users::delete)),
+            )
+            .service(
+                web::scope("/roles")
+                    .route("", web::get().to(roles::list))
+                    .route("", web::post().to(roles::create))
+                    .route("/{id}/permissions", web::get().to(roles::get_permissions))
+                    .route("/{id}/permissions", web::put().to(roles::update_permissions)),
             ),
     );
 }
