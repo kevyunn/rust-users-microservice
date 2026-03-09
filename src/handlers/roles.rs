@@ -22,21 +22,19 @@ pub struct UpdatePermissionsRequest {
     pub permissions: Vec<PermissionItem>,
 }
 
-fn require_admin(auth_user: &AuthenticatedUser) -> Result<(), AppError> {
-    if auth_user.role != "admin" {
-        return Err(AppError::Forbidden(
-            "Only admins can manage roles".into(),
-        ));
-    }
-    Ok(())
-}
-
 pub async fn list(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,
 ) -> Result<HttpResponse, AppError> {
-    require_admin(&auth_user)?;
     let pool = pool.into_inner();
+    let role_id = auth_user.role_id;
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, role_id, "roles", "read")
+    })
+    .await??;
+
     let roles = web::block(move || role_service::list_roles(&pool)).await??;
     Ok(HttpResponse::Ok().json(roles))
 }
@@ -46,7 +44,6 @@ pub async fn create(
     auth_user: AuthenticatedUser,
     body: web::Json<CreateRoleRequest>,
 ) -> Result<HttpResponse, AppError> {
-    require_admin(&auth_user)?;
     let name = body.name.trim().to_string();
     if name.is_empty() {
         return Err(AppError::BadRequest("Role name is required".into()));
@@ -57,6 +54,14 @@ pub async fn create(
         ));
     }
     let pool = pool.into_inner();
+    let role_id = auth_user.role_id;
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, role_id, "roles", "create")
+    })
+    .await??;
+
     let role = web::block(move || role_service::create_role(&pool, name)).await??;
     Ok(HttpResponse::Created().json(role))
 }
@@ -66,11 +71,18 @@ pub async fn get_permissions(
     auth_user: AuthenticatedUser,
     path: web::Path<i32>,
 ) -> Result<HttpResponse, AppError> {
-    require_admin(&auth_user)?;
-    let role_id = path.into_inner();
+    let target_role_id = path.into_inner();
     let pool = pool.into_inner();
+    let auth_role_id = auth_user.role_id;
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, auth_role_id, "roles", "read")
+    })
+    .await??;
+
     let permissions =
-        web::block(move || role_service::get_role_permissions(&pool, role_id)).await??;
+        web::block(move || role_service::get_role_permissions(&pool, target_role_id)).await??;
     let response: Vec<PermissionItem> = permissions
         .into_iter()
         .map(|p| PermissionItem {
@@ -87,16 +99,24 @@ pub async fn update_permissions(
     path: web::Path<i32>,
     body: web::Json<UpdatePermissionsRequest>,
 ) -> Result<HttpResponse, AppError> {
-    require_admin(&auth_user)?;
-    let role_id = path.into_inner();
+    let target_role_id = path.into_inner();
+    let pool = pool.into_inner();
+    let auth_role_id = auth_user.role_id;
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, auth_role_id, "roles", "update")
+    })
+    .await??;
+
     let items: Vec<(String, String)> = body
         .permissions
         .iter()
         .map(|p| (p.resource.clone(), p.action.clone()))
         .collect();
-    let pool = pool.into_inner();
     let permissions =
-        web::block(move || role_service::update_role_permissions(&pool, role_id, items)).await??;
+        web::block(move || role_service::update_role_permissions(&pool, target_role_id, items))
+            .await??;
     let response: Vec<PermissionItem> = permissions
         .into_iter()
         .map(|p| PermissionItem {
@@ -155,7 +175,7 @@ mod tests {
     async fn test_list_roles_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::get()
             .uri("/api/roles")
@@ -170,7 +190,7 @@ mod tests {
     async fn test_create_role_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::post()
             .uri("/api/roles")
@@ -186,7 +206,7 @@ mod tests {
     async fn test_get_permissions_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::get()
             .uri("/api/roles/1/permissions")
@@ -201,7 +221,7 @@ mod tests {
     async fn test_update_permissions_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::put()
             .uri("/api/roles/1/permissions")

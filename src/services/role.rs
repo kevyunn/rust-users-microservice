@@ -28,6 +28,25 @@ pub fn create_role(pool: &DbPool, name: String) -> Result<Role, AppError> {
         .map_err(Into::into)
 }
 
+pub fn require_permission(
+    pool: &DbPool,
+    role_id: i32,
+    resource: &str,
+    action: &str,
+) -> Result<(), AppError> {
+    let perms = get_role_permissions(pool, role_id)?;
+    let has = perms
+        .iter()
+        .any(|p| p.resource == resource && p.action == action);
+    if has {
+        Ok(())
+    } else {
+        Err(AppError::Forbidden(format!(
+            "Permission {resource}:{action} required"
+        )))
+    }
+}
+
 pub fn get_role_permissions(pool: &DbPool, role_id: i32) -> Result<Vec<Permission>, AppError> {
     let mut conn = pool.get().map_err(|e| AppError::DbError(e.to_string()))?;
     let _role: Role = roles::table

@@ -10,6 +10,7 @@ pub struct AuthenticatedUser {
     pub user_id: i32,
     pub username: String,
     pub role: String,
+    pub role_id: i32,
 }
 
 impl From<Claims> for AuthenticatedUser {
@@ -18,6 +19,7 @@ impl From<Claims> for AuthenticatedUser {
             user_id: claims.sub,
             username: claims.username,
             role: claims.role,
+            role_id: claims.role_id,
         }
     }
 }
@@ -146,7 +148,7 @@ mod tests {
         )
         .await;
 
-        let token = generate_token(1, "john", "admin", TEST_SECRET).unwrap();
+        let token = generate_token(1, "john", "admin", 1, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::get()
             .uri("/protected")
@@ -171,7 +173,7 @@ mod tests {
         )
         .await;
 
-        let token = generate_token(1, "john", "admin", "different-secret").unwrap();
+        let token = generate_token(1, "john", "admin", 1, "different-secret").unwrap();
 
         let req = test::TestRequest::get()
             .uri("/protected")

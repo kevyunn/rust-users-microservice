@@ -10,6 +10,7 @@ pub struct Claims {
     pub sub: i32,
     pub username: String,
     pub role: String,
+    pub role_id: i32,
     pub iat: usize,
     pub exp: usize,
 }
@@ -28,6 +29,7 @@ pub fn generate_token(
     user_id: i32,
     username: &str,
     role: &str,
+    role_id: i32,
     secret: &str,
 ) -> Result<String, AppError> {
     let now = chrono::Utc::now().timestamp() as usize;
@@ -37,6 +39,7 @@ pub fn generate_token(
         sub: user_id,
         username: username.to_string(),
         role: role.to_string(),
+        role_id,
         iat: now,
         exp: exp,
     };
@@ -102,17 +105,18 @@ mod tests {
 
     #[test]
     fn test_generate_and_validate_token() {
-        let token = generate_token(1, "john", "admin", TEST_SECRET).unwrap();
+        let token = generate_token(1, "john", "admin", 1, TEST_SECRET).unwrap();
 
         let claims = validate_token(&token, TEST_SECRET).unwrap();
         assert_eq!(claims.sub, 1);
         assert_eq!(claims.username, "john");
         assert_eq!(claims.role, "admin");
+        assert_eq!(claims.role_id, 1);
     }
 
     #[test]
     fn test_validate_token_wrong_secret() {
-        let token = generate_token(1, "john", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "john", "user", 3, TEST_SECRET).unwrap();
 
         let result = validate_token(&token, "wrong-secret");
         assert!(result.is_err());
@@ -126,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_token_contains_correct_expiration() {
-        let token = generate_token(42, "alice", "manager", TEST_SECRET).unwrap();
+        let token = generate_token(42, "alice", "manager", 2, TEST_SECRET).unwrap();
         let claims = validate_token(&token, TEST_SECRET).unwrap();
 
         let expected_duration = JWT_EXPIRATION_HOURS as usize * 3600;
@@ -140,6 +144,7 @@ mod tests {
             sub: 5,
             username: "bob".to_string(),
             role: "user".to_string(),
+            role_id: 3,
             iat: 0,
             exp: 9999999999,
         };
@@ -148,5 +153,6 @@ mod tests {
         assert_eq!(user.user_id, 5);
         assert_eq!(user.username, "bob");
         assert_eq!(user.role, "user");
+        assert_eq!(user.role_id, 3);
     }
 }

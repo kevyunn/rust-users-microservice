@@ -7,6 +7,7 @@ use crate::middleware::auth::AuthenticatedUser;
 use crate::models::role::Role;
 use crate::models::user::{User, UserResponse};
 use crate::schema::{roles, users};
+use crate::services::role as role_service;
 use crate::services::user as user_service;
 use diesel::prelude::*;
 
@@ -39,11 +40,19 @@ pub async fn me(
     auth_user: AuthenticatedUser,
 ) -> Result<HttpResponse, AppError> {
     let pool = pool.into_inner();
+    let role_id = auth_user.role_id;
+    let user_id = auth_user.user_id;
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, role_id, "users", "read_own")
+    })
+    .await??;
 
     let user_response = web::block(move || {
         let mut conn = pool.get().map_err(|e| AppError::DbError(e.to_string()))?;
 
-        let user: User = users::table.find(auth_user.user_id).first(&mut conn)?;
+        let user: User = users::table.find(user_id).first(&mut conn)?;
         let role: Role = roles::table.find(user.role_id).first(&mut conn)?;
 
         Ok::<UserResponse, AppError>(UserResponse::from_user(user, role.name))
@@ -58,16 +67,16 @@ pub async fn list(
     auth_user: AuthenticatedUser,
     query: web::Query<PaginationParams>,
 ) -> Result<HttpResponse, AppError> {
-    if auth_user.role != "admin" {
-        return Err(AppError::Forbidden(
-            "Only admins can list all users".into(),
-        ));
-    }
-
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
-
     let pool = pool.into_inner();
+    let role_id = auth_user.role_id;
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, role_id, "users", "read")
+    })
+    .await??;
 
     let (users, total) =
         web::block(move || user_service::list_users(&pool, page, per_page)).await??;
@@ -86,14 +95,19 @@ pub async fn get_by_id(
     path: web::Path<i32>,
 ) -> Result<HttpResponse, AppError> {
     let target_id = path.into_inner();
-
-    if auth_user.role != "admin" && auth_user.user_id != target_id {
-        return Err(AppError::Forbidden(
-            "You can only view your own profile".into(),
-        ));
-    }
-
     let pool = pool.into_inner();
+    let role_id = auth_user.role_id;
+    let action = if target_id == auth_user.user_id {
+        "read_own"
+    } else {
+        "read"
+    };
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, role_id, "users", action)
+    })
+    .await??;
 
     let user_response =
         web::block(move || user_service::find_user_by_id(&pool, target_id)).await??;
@@ -108,22 +122,37 @@ pub async fn update(
     body: web::Json<UpdateUserRequest>,
 ) -> Result<HttpResponse, AppError> {
     let target_id = path.into_inner();
-    let is_admin = auth_user.role == "admin";
-
-    if !is_admin && auth_user.user_id != target_id {
-        return Err(AppError::Forbidden(
-            "You can only update your own profile".into(),
-        ));
-    }
-
-    if !is_admin && (body.role_id.is_some() || body.is_active.is_some()) {
-        return Err(AppError::Forbidden(
-            "Only admins can change role or active status".into(),
-        ));
-    }
-
-    let body = body.into_inner();
     let pool = pool.into_inner();
+    let role_id = auth_user.role_id;
+    let body = body.into_inner();
+
+    let (required_action, allow_role_or_active) = if target_id == auth_user.user_id {
+        ("update_own", false)
+    } else {
+        ("update", true)
+    };
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, role_id, "users", required_action)
+    })
+    .await??;
+
+    let can_change_role_or_active = allow_role_or_active
+        && web::block({
+            let pool = pool.clone();
+            move || role_service::require_permission(&pool, role_id, "users", "update")
+        })
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .is_some();
+
+    if (body.role_id.is_some() || body.is_active.is_some()) && !can_change_role_or_active {
+        return Err(AppError::Forbidden(
+            "Only users with users:update can change role or active status".into(),
+        ));
+    }
 
     let user_response = web::block(move || {
         user_service::update_user(
@@ -133,9 +162,17 @@ pub async fn update(
             body.first_name,
             body.last_name,
             body.password,
-            body.role_id,
-            body.is_active,
-            is_admin,
+            if can_change_role_or_active {
+                body.role_id
+            } else {
+                None
+            },
+            if can_change_role_or_active {
+                body.is_active
+            } else {
+                None
+            },
+            can_change_role_or_active,
         )
     })
     .await??;
@@ -148,14 +185,15 @@ pub async fn delete(
     auth_user: AuthenticatedUser,
     path: web::Path<i32>,
 ) -> Result<HttpResponse, AppError> {
-    if auth_user.role != "admin" {
-        return Err(AppError::Forbidden(
-            "Only admins can deactivate users".into(),
-        ));
-    }
-
     let target_id = path.into_inner();
     let pool = pool.into_inner();
+    let role_id = auth_user.role_id;
+
+    web::block({
+        let pool = pool.clone();
+        move || role_service::require_permission(&pool, role_id, "users", "delete")
+    })
+    .await??;
 
     web::block(move || user_service::deactivate_user(&pool, target_id)).await??;
 
@@ -211,7 +249,7 @@ mod tests {
     async fn test_list_users_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::get()
             .uri("/api/users")
@@ -226,7 +264,7 @@ mod tests {
     async fn test_get_other_user_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::get()
             .uri("/api/users/999")
@@ -241,7 +279,7 @@ mod tests {
     async fn test_update_other_user_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::put()
             .uri("/api/users/999")
@@ -259,7 +297,7 @@ mod tests {
     async fn test_update_role_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::put()
             .uri("/api/users/1")
@@ -277,7 +315,7 @@ mod tests {
     async fn test_update_is_active_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::put()
             .uri("/api/users/1")
@@ -295,7 +333,7 @@ mod tests {
     async fn test_delete_forbidden_for_non_admin() {
         let app = test::init_service(build_test_app()).await;
 
-        let token = generate_token(1, "regular", "user", TEST_SECRET).unwrap();
+        let token = generate_token(1, "regular", "user", 3, TEST_SECRET).unwrap();
 
         let req = test::TestRequest::delete()
             .uri("/api/users/1")
