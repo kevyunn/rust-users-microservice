@@ -53,7 +53,6 @@ pub fn update_role_permissions(
         .first(&mut conn)
         .map_err(|_| AppError::NotFound(format!("Role with id {} not found", role_id)))?;
 
-    // Deduplicate by (resource, action) to avoid UNIQUE violation
     let mut seen = std::collections::HashSet::new();
     let unique_items: Vec<_> = items
         .into_iter()
