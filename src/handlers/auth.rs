@@ -112,7 +112,7 @@ pub async fn login(
 
         let role: Role = roles::table.find(user.role_id).first(&mut conn)?;
 
-        let token = auth::generate_token(user.id, &user.username, &role.name, &secret.0)?;
+        let token = auth::generate_token(user.id, &user.username, &role.name, role.id, &secret.0)?;
 
         Ok::<LoginResponse, AppError>(LoginResponse {
             access_token: token,
