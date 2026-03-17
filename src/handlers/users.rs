@@ -1,8 +1,9 @@
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::db::DbPool;
-use crate::errors::AppError;
+use crate::errors::{AppError, ErrorResponse};
 use crate::middleware::auth::AuthenticatedUser;
 use crate::models::role::Role;
 use crate::models::user::{User, UserResponse};
@@ -11,7 +12,7 @@ use crate::services::role as role_service;
 use crate::services::user as user_service;
 use diesel::prelude::*;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateUserRequest {
     pub email: Option<String>,
     pub first_name: Option<String>,
@@ -35,6 +36,25 @@ pub struct PaginatedResponse<T: serde::Serialize> {
     pub per_page: i64,
 }
 
+/// Response for GET /api/users (for OpenAPI schema)
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PaginatedUsersResponse {
+    pub data: Vec<crate::models::user::UserResponse>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/users/me",
+    responses(
+        (status = 200, description = "Current user", body = UserResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn me(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,
@@ -62,6 +82,20 @@ pub async fn me(
     Ok(HttpResponse::Ok().json(user_response))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/users",
+    params(
+        ("page" = Option<i64>, Query, description = "Page number"),
+        ("per_page" = Option<i64>, Query, description = "Items per page")
+    ),
+    responses(
+        (status = 200, description = "Paginated users", body = PaginatedUsersResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn list(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,
@@ -89,6 +123,18 @@ pub async fn list(
     }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/users/{id}",
+    params(("id" = i32, Path, description = "User ID")),
+    responses(
+        (status = 200, description = "User", body = UserResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Not found", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn get_by_id(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,
@@ -115,6 +161,19 @@ pub async fn get_by_id(
     Ok(HttpResponse::Ok().json(user_response))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/users/{id}",
+    params(("id" = i32, Path, description = "User ID")),
+    request_body = UpdateUserRequest,
+    responses(
+        (status = 200, description = "Updated user", body = UserResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Not found", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn update(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,
@@ -180,6 +239,17 @@ pub async fn update(
     Ok(HttpResponse::Ok().json(user_response))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/users/{id}",
+    params(("id" = i32, Path, description = "User ID")),
+    responses(
+        (status = 204, description = "Deactivated"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn delete(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,

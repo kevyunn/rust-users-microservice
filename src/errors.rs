@@ -1,9 +1,10 @@
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use serde::Serialize;
 use std::fmt;
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize)]
-struct ErrorResponse {
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ErrorResponse {
     error: String,
     message: String,
 }

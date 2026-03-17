@@ -1,16 +1,17 @@
 use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::config::JwtSecret;
 use crate::db::DbPool;
-use crate::errors::AppError;
+use crate::errors::{AppError, ErrorResponse};
 use crate::models::role::Role;
 use crate::models::user::{NewUser, User, UserResponse};
 use crate::schema::{roles, users};
 use crate::services::auth;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterRequest {
     pub username: String,
     pub email: String,
@@ -19,19 +20,28 @@ pub struct RegisterRequest {
     pub last_name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct LoginResponse {
     pub access_token: String,
     pub token_type: String,
     pub expires_in: i64,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/auth/register",
+    request_body = RegisterRequest,
+    responses(
+        (status = 201, description = "Created", body = UserResponse),
+        (status = 400, description = "Bad request", body = ErrorResponse)
+    )
+)]
 pub async fn register(
     pool: web::Data<DbPool>,
     body: web::Json<RegisterRequest>,
@@ -82,6 +92,15 @@ pub async fn register(
     Ok(HttpResponse::Created().json(user_response))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/auth/login",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "OK", body = LoginResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
+    )
+)]
 pub async fn login(
     pool: web::Data<DbPool>,
     jwt_secret: web::Data<JwtSecret>,
