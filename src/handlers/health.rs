@@ -1,8 +1,22 @@
 use actix_web::{HttpResponse, web};
 use diesel::RunQueryDsl;
+use utoipa::ToSchema;
 
 use crate::db::DbPool;
 
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct HealthResponse {
+    pub status: String,
+    pub db: String,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/health",
+    responses(
+        (status = 200, description = "Health check", body = HealthResponse)
+    )
+)]
 pub async fn health_check(pool: web::Data<DbPool>) -> HttpResponse {
     let pool = pool.into_inner();
 
@@ -27,8 +41,8 @@ pub async fn health_check(pool: web::Data<DbPool>) -> HttpResponse {
         "error"
     };
 
-    HttpResponse::Ok().json(serde_json::json!({
-        "status": status,
-        "db": db_status
-    }))
+    HttpResponse::Ok().json(HealthResponse {
+        status: status.to_string(),
+        db: db_status,
+    })
 }

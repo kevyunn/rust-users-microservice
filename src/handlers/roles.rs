@@ -1,27 +1,39 @@
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::db::DbPool;
-use crate::errors::AppError;
+use crate::errors::{AppError, ErrorResponse};
+use crate::models::role::Role;
 use crate::middleware::auth::AuthenticatedUser;
 use crate::services::role as role_service;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateRoleRequest {
     pub name: String,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct PermissionItem {
     pub resource: String,
     pub action: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdatePermissionsRequest {
     pub permissions: Vec<PermissionItem>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/roles",
+    responses(
+        (status = 200, description = "List of roles", body = Vec<Role>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn list(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,
@@ -39,6 +51,18 @@ pub async fn list(
     Ok(HttpResponse::Ok().json(roles))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/roles",
+    request_body = CreateRoleRequest,
+    responses(
+        (status = 201, description = "Created role", body = Role),
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn create(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,
@@ -66,6 +90,18 @@ pub async fn create(
     Ok(HttpResponse::Created().json(role))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/roles/{id}/permissions",
+    params(("id" = i32, Path, description = "Role ID")),
+    responses(
+        (status = 200, description = "Role permissions", body = Vec<PermissionItem>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Not found", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn get_permissions(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,
@@ -93,6 +129,20 @@ pub async fn get_permissions(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/roles/{id}/permissions",
+    params(("id" = i32, Path, description = "Role ID")),
+    request_body = UpdatePermissionsRequest,
+    responses(
+        (status = 200, description = "Updated permissions", body = Vec<PermissionItem>),
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Not found", body = ErrorResponse)
+    ),
+    security((), ("bearer_auth" = []))
+)]
 pub async fn update_permissions(
     pool: web::Data<DbPool>,
     auth_user: AuthenticatedUser,

@@ -1,6 +1,7 @@
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::schema::users;
 
@@ -42,7 +43,7 @@ pub struct UpdateUser {
     pub updated_at: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct UserResponse {
     pub id: i32,
     pub username: String,
