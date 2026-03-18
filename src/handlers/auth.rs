@@ -36,6 +36,7 @@ pub struct LoginResponse {
 #[utoipa::path(
     post,
     path = "/api/auth/register",
+    tag = "auth",
     request_body = RegisterRequest,
     responses(
         (status = 201, description = "Created", body = UserResponse),
@@ -95,6 +96,7 @@ pub async fn register(
 #[utoipa::path(
     post,
     path = "/api/auth/login",
+    tag = "auth",
     request_body = LoginRequest,
     responses(
         (status = 200, description = "OK", body = LoginResponse),

@@ -27,6 +27,8 @@ pub struct UpdatePermissionsRequest {
 #[utoipa::path(
     get,
     path = "/api/roles",
+    operation_id = "list_roles",
+    tag = "roles",
     responses(
         (status = 200, description = "List of roles", body = Vec<Role>),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
@@ -54,6 +56,7 @@ pub async fn list(
 #[utoipa::path(
     post,
     path = "/api/roles",
+    tag = "roles",
     request_body = CreateRoleRequest,
     responses(
         (status = 201, description = "Created role", body = Role),
@@ -93,6 +96,7 @@ pub async fn create(
 #[utoipa::path(
     get,
     path = "/api/roles/{id}/permissions",
+    tag = "roles",
     params(("id" = i32, Path, description = "Role ID")),
     responses(
         (status = 200, description = "Role permissions", body = Vec<PermissionItem>),
@@ -132,6 +136,7 @@ pub async fn get_permissions(
 #[utoipa::path(
     put,
     path = "/api/roles/{id}/permissions",
+    tag = "roles",
     params(("id" = i32, Path, description = "Role ID")),
     request_body = UpdatePermissionsRequest,
     responses(

@@ -48,6 +48,7 @@ pub struct PaginatedUsersResponse {
 #[utoipa::path(
     get,
     path = "/api/users/me",
+    tag = "users",
     responses(
         (status = 200, description = "Current user", body = UserResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
@@ -85,6 +86,8 @@ pub async fn me(
 #[utoipa::path(
     get,
     path = "/api/users",
+    operation_id = "list_users",
+    tag = "users",
     params(
         ("page" = Option<i64>, Query, description = "Page number"),
         ("per_page" = Option<i64>, Query, description = "Items per page")
@@ -126,6 +129,7 @@ pub async fn list(
 #[utoipa::path(
     get,
     path = "/api/users/{id}",
+    tag = "users",
     params(("id" = i32, Path, description = "User ID")),
     responses(
         (status = 200, description = "User", body = UserResponse),
@@ -164,6 +168,7 @@ pub async fn get_by_id(
 #[utoipa::path(
     put,
     path = "/api/users/{id}",
+    tag = "users",
     params(("id" = i32, Path, description = "User ID")),
     request_body = UpdateUserRequest,
     responses(
@@ -242,6 +247,7 @@ pub async fn update(
 #[utoipa::path(
     delete,
     path = "/api/users/{id}",
+    tag = "users",
     params(("id" = i32, Path, description = "User ID")),
     responses(
         (status = 204, description = "Deactivated"),
