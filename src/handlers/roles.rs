@@ -13,7 +13,7 @@ pub struct CreateRoleRequest {
     pub name: String,
 }
 
-#[derive(Debug, serde::Serialize, ToSchema)]
+#[derive(Debug, serde::Serialize, Deserialize, ToSchema)]
 pub struct PermissionItem {
     pub resource: String,
     pub action: String,

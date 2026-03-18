@@ -1,4 +1,4 @@
-use utoipa::OpenAPI;
+use utoipa::OpenApi;
 
 use crate::errors::ErrorResponse;
 use crate::handlers::auth::{LoginRequest, LoginResponse, RegisterRequest};
@@ -8,7 +8,7 @@ use crate::handlers::users::{PaginatedUsersResponse, UpdateUserRequest};
 use crate::models::role::Role;
 use crate::models::user::UserResponse;
 
-#[derive(OpenAPI)]
+#[derive(OpenApi)]
 #[openapi(
     info(
         title = "Users Microservice API",
@@ -63,10 +63,10 @@ impl utoipa::Modify for SecurityAddon {
             components.add_security_scheme(
                 "bearer_auth",
                 utoipa::openapi::security::SecurityScheme::Http(
-                    utoipa::openapi::security::Http::new(
-                        utoipa::openapi::security::HttpAuthScheme::Bearer,
-                    )
-                    .bearer_format("JWT"),
+                    utoipa::openapi::security::HttpBuilder::new()
+                        .scheme(utoipa::openapi::security::HttpAuthScheme::Bearer)
+                        .bearer_format("JWT")
+                        .build(),
                 ),
             );
         }
